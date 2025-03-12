@@ -669,21 +669,18 @@ const trendingPools = await agent.getTrendingPools("24h");
 console.log("Trending pools:", trendingPools);
 ```
 
-## OKX DEX API Tools
+## DEX API Tools
 
-### Integration
+### OKX DEX Integration
 
-The toolkit provides integration with OKX DEX for Solana including token swaps, liquidity sources, and chain data queries
-using the OKX API keys and Solana wallet address.
-
-Here's how to apply the OKX DEX API tools:
+The toolkit provides comprehensive integration with OKX DEX for Solana. Here's how to use the DEX API tools:
 
 ### Get Supported Tokens
 
 ```typescript
 const tokens = await agent.getTokens();
 console.log("Supported tokens:", tokens);
-// Returns list of tokens with symbol, name, address, and decimals
+// Returns list of tokens available on OKX DEX
 ```
 
 ### Get DEX Quote
@@ -696,7 +693,7 @@ const quote = await agent.getQuote(
   "0.5" // slippage (optional, default 0.5%)
 );
 console.log("Swap quote:", quote);
-// Returns quote data with price, amount, and slippage, decimals, and token symbols
+// Returns quote data with price, fees, and slippage, token symbol, decimals
 ```
 
 ### Execute Token Swap
@@ -714,24 +711,9 @@ const swapResult = await agent.executeSwap({
 console.log("Swap executed:", swapResult);
 ```
 
-### Get Liquidity Sources
-
-```typescript
-const liquidity = await agent.getLiquidity();
-console.log("Available liquidity sources:", liquidity);
-// Returns list of DEX liquidity sources on Solana
-```
-
 ### Get Chain Data
 
-```typescript
-const chain_data = await agent.getChainData();
-console.log("chain data:", chain_data);
-// Returns information for DEX router addresses
-```
-
-Note: To use OKX DEX integration, you need to set up the following environment variables: 
-Get OKX API keys from the [OKX Developer Portal] (https://www.okx.com/web3/build/dev-portal)
+Note: To use OKX DEX integration, you need to set up the following environment variables: Get OKX API keys from the [OKX Developer Portal] (https://www.okx.com/web3/build/dev-portal)
 - `OKX_API_KEY`
 - `OKX_SECRET_KEY`
 - `OKX_API_PASSPHRASE`
