@@ -3,10 +3,18 @@ export const fetchCache = "force-no-store";
 export const maxDuration = 60; // can use 300 with vercel premium
 
 import { Bot, webhookCallback } from "grammy";
-import { SolanaAgentKit, createSolanaTools } from "solana-agent-kit";
-import { ChatOpenAI } from "@langchain/openai";
 import { MemorySaver } from "@langchain/langgraph";
+import NFTPlugin from "@solana-agent-kit/plugin-nft";
+import TokenPlugin from "@solana-agent-kit/plugin-token";
+import {
+  KeypairWallet,
+  SolanaAgentKit,
+  createLangchainTools,
+} from "solana-agent-kit";
+import { Keypair } from "@solana/web3.js";
+import bs58 from "bs58";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
+import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage } from "@langchain/core/messages";
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -18,17 +26,20 @@ const bot = new Bot(token);
 async function initializeAgent(userId: string) {
   try {
     const llm = new ChatOpenAI({
-      modelName: "gpt-4o-mini",
-      temperature: 0.7,
+      model: "gpt-4o",
+      temperature: 0,
+      apiKey: process.env.OPENAI_API_KEY as string,
     });
-
-    const solanaKit = new SolanaAgentKit(
-      process.env.SOLANA_PRIVATE_KEY!,
-      process.env.RPC_URL,
-      process.env.OPENAI_API_KEY!,
+    const keyPair = Keypair.fromSecretKey(
+      bs58.decode(process.env.SOLANA_PRIVATE_KEY as string)
     );
-
-    const tools = createSolanaTools(solanaKit);
+    const wallet = new KeypairWallet(keyPair, process.env.RPC_URL as string);
+    const solanaKit = new SolanaAgentKit(wallet, process.env.RPC_URL!, {
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    })
+      .use(TokenPlugin)
+      .use(NFTPlugin);
+    const tools = createLangchainTools(solanaKit, solanaKit.actions);
     const memory = new MemorySaver();
     const config = { configurable: { thread_id: userId } };
     const agent = createReactAgent({
@@ -37,8 +48,7 @@ async function initializeAgent(userId: string) {
       checkpointSaver: memory,
       messageModifier: `
         You are a helpful agent that can interact onchain using the Solana Agent Kit. You are
-        empowered to interact onchain using your tools. If you ever need funds, you can request them from the
-        faucet. If not, you can provide your wallet details and request funds from the user. If there is a 5XX
+        empowered to interact onchain using your tools. If you need funds you can request it from the user and provide your wallet details. If there is a 5XX
         (internal) HTTP error code, ask the user to try again later. If someone asks you to do something you
         can't do with your currently available tools, you must say so, and encourage them to implement it
         themselves using the Solana Agent Kit, recommend they go to https://www.solanaagentkit.xyz for more information. Be
@@ -51,6 +61,7 @@ async function initializeAgent(userId: string) {
     throw error;
   }
 }
+
 // Telegram bot handler
 bot.on("message:text", async (ctx: any) => {
   const userId = ctx.from?.id.toString();
@@ -60,10 +71,10 @@ bot.on("message:text", async (ctx: any) => {
   const { agent, config } = await initializeAgent(userId);
   const stream = await agent.stream(
     { messages: [new HumanMessage(ctx.message.text)] },
-    config,
+    config
   );
   const timeoutPromise = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error("Timeout")), 20000),
+    setTimeout(() => reject(new Error("Timeout")), 20000)
   );
   try {
     for await (const chunk of (await Promise.race([
@@ -79,12 +90,12 @@ bot.on("message:text", async (ctx: any) => {
   } catch (error: any) {
     if (error.message === "Timeout") {
       await ctx.reply(
-        "I'm sorry, the operation took too long and timed out. Please try again.",
+        "I'm sorry, the operation took too long and timed out. Please try again."
       );
     } else {
       console.error("Error processing stream:", error);
       await ctx.reply(
-        "I'm sorry, an error occurred while processing your request.",
+        "I'm sorry, an error occurred while processing your request."
       );
     }
   }

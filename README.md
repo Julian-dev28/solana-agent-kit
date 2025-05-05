@@ -2,7 +2,7 @@
 
 # Solana Agent Kit
 
-![Solana Agent Kit Cover 1 (3)](https://github.com/user-attachments/assets/cfa380f6-79d9-474d-9852-3e1976c6de70)
+![SAKCover2](https://github.com/user-attachments/assets/a6072421-8958-4cee-934a-a10ea32ae75e)
 
 ![NPM Downloads](https://img.shields.io/npm/dm/solana-agent-kit?style=for-the-badge)
 ![GitHub forks](https://img.shields.io/github/forks/sendaifun/solana-agent-kit?style=for-the-badge)
@@ -18,6 +18,7 @@ An open-source toolkit for connecting AI agents to Solana protocols. Now, any ag
 - Send compressed airdrops
 - Execute blinks
 - Launch tokens on AMMs
+- Bridge tokens across chains
 - And more...
 
 Anyone - whether an SF-based AI researcher or a crypto-native builder - can bring their AI agents trained with any model and seamlessly integrate with Solana.
@@ -33,6 +34,7 @@ Anyone - whether an SF-based AI researcher or a crypto-native builder - can brin
   - Balance checks
   - Stake SOL
   - Zk compressed Airdrop by Light Protocol and Helius
+  - Bridge tokens across chains using Wormhole
 - **NFTs on 3.Land**
   - Create your own collection
   - NFT creation and automatic listing on 3.land
@@ -58,6 +60,7 @@ Anyone - whether an SF-based AI researcher or a crypto-native builder - can brin
   - Perpetuals Trading with Adrena Protocol
   - Drift Vaults, Perps, Lending and Borrowing
   - Cross-chain bridging via deBridge DLN
+  - Cross chain bridging via Wormhole
 
 - **Solana Blinks**
    - Lending by Lulo (Best APR for USDC)
@@ -102,36 +105,75 @@ Anyone - whether an SF-based AI researcher or a crypto-native builder - can brin
   - Automated decision-making capabilities
 
 ## 📃 Documentation
+
 You can view the full documentation of the kit at [docs.sendai.fun](https://docs.sendai.fun/v0/introduction)
 
-## 📦 Installation
+## Why We Built V2 and Why Upgrade?
+
+The Solana Agent Kit V2 is a major upgrade from V1, to learn why check out our [migration guide](./MIGRATING)
+
+## 📦 Core Installation
 
 ```bash
 npm install solana-agent-kit
 ```
 
+## 📦 Plugin Installation
+
+You can choose to install any of the plugins listed below or you could choose to install all of them to experience the full power of the Solana Agent Kit.
+
+1. Token plugin (`@solana-agent-kit/plugin-token`): Token operations for SPL tokens such as transferring assets, swapping, bridging, and rug checking.
+2. NFT plugin (`@solana-agent-kit/plugin-nft`): NFT operations for Metaplex NFTs such as minting, listing, and metadata management.
+3. DeFi plugin (`@solana-agent-kit/plugin-defi`): DeFi operations for Solana protocols such as staking, lending, borrowing, and spot and perpetual trading.
+4. Misc plugin (`@solana-agent-kit/plugin-misc`): Miscellaneous operations such as airdrops, price feeds, coingecko token information, and domain registration.
+5. Blinks plugin (`@solana-agent-kit/plugin-blinks`): Blinks operations for Solana protocols such as arcade games and more soon to come.
+
+```bash
+npm install @solana-agent-kit/plugin-token @solana-agent-kit/plugin-nft @solana-agent-kit/plugin-defi @solana-agent-kit/plugin-misc @solana-agent-kit/plugin-blinks
+```
+
 ## Quick Start
 
+Initializing the wallet interface and agent with plugins:
+
 ```typescript
-import { SolanaAgentKit, createSolanaTools } from "solana-agent-kit";
+import { SolanaAgentKit, createVercelAITools, KeypairWallet } from "solana-agent-kit"; // or import createLangchainTools if using langchain
+import TokenPlugin from "@solana-agent-kit/plugin-token";
+import NFTPlugin from "@solana-agent-kit/plugin-nft";
+import DefiPlugin from "@solana-agent-kit/plugin-defi";
+import MiscPlugin from "@solana-agent-kit/plugin-misc";
+import BlinksPlugin from "@solana-agent-kit/plugin-blinks";
+
+const keyPair = Keypair.fromSecretKey(bs58.decode("YOUR_SECRET_KEY"))
+const wallet = new KeypairWallet(keyPair)
 
 // Initialize with private key and optional RPC URL
 const agent = new SolanaAgentKit(
-  "your-wallet-private-key-as-base58",
-  "https://api.mainnet-beta.solana.com",
-  "your-openai-api-key"
-);
+  wallet,
+  "YOUR_RPC_URL",
+  {
+    OPENAI_API_KEY: "YOUR_OPENAI_API_KEY",
+  }
+) // Add the plugins you would like to use
+  .use(TokenPlugin)
+  .use(NFTPlugin)
+  .use(DefiPlugin)
+  .use(MiscPlugin)
+  .use(BlinksPlugin);
 
 // Create LangChain tools
-const tools = createSolanaTools(agent);
+const tools = createVercelAITools(agent, agent.actions);
 ```
 
-## Usage Examples
+You can also make use of the wallet interface provided by the Solana wallet adapter for embedded wallets.
+
+## Usage Examples Using Tools From The Token, Defi, and Other Plugins
 
 ### Deploy a New Token
 
 ```typescript
-const result = await agent.deployToken(
+const result = await agent.methods.deployToken(
+  agent,
   "my ai token", // name
   "uri", // uri
   "token", // symbol
@@ -147,6 +189,27 @@ const result = await agent.deployToken(
 
 console.log("Token Mint Address:", result.mint.toString());
 ```
+
+### Deploy a New Token2022
+
+```typescript
+const result = await agent.methods.deployToken2022(
+  "my ai token 2022", // name
+  "uri", // uri
+  "token2022", // symbol
+  9, // decimals
+  {
+    mintAuthority: null, // by default, deployer account
+    freezeAuthority: null, // by default, deployer account
+    updateAuthority: undefined, // by default, deployer account
+    isMutable: false // by default, true
+  },
+  1000000 // initial supply
+);
+
+console.log("Token2022 Mint Address:", result.mint.toString());
+```
+
 ### Create NFT Collection on 3Land
 ```typescript
 const isDevnet = false; // (Optional) if not present TX takes place in Mainnet
@@ -159,7 +222,7 @@ const priorityFeeParam = 1000000; // (Optional) if not present the default prior
     mainImageUrl: ""
   };
 
-const result = await agent.create3LandCollection(
+const result = await agent.methods.create3LandCollection(
       collectionOpts,
       isDevnet, // (Optional) if not present TX takes place in Mainnet
       priorityFeeParam, //(Optional)
@@ -167,7 +230,9 @@ const result = await agent.create3LandCollection(
 ```
 
 ### Create NFT on 3Land
+
 When creating an NFT using 3Land's tool, it automatically goes for sale on 3.land website
+
 ```typescript
 const isDevnet = true; // (Optional) if not present TX takes place in Mainnet
 const withPool = true; // (Optional) only present if NFT will be created with a Liquidity Pool for a specific SPL token
@@ -187,21 +252,20 @@ const createItemOptions: CreateSingleOptions = {
   poolName: "", // Only present if "withPool" is true
   mainImageUrl: "",
 };
-const result = await agent.create3LandNft(
+const result = await agent.methods.create3LandSingle(
+  {},
   collectionAccount,
   createItemOptions,
   isDevnet, // (Optional) if not present TX takes place in Mainnet
   withPool
   priorityFeeParam, //(Optional)
 );
-
 ```
-
 
 ### Create NFT Collection
 
 ```typescript
-const collection = await agent.deployCollection({
+const collection = await agent.methods.deployCollection(agent, {
   name: "My NFT Collection",
   uri: "https://arweave.net/metadata.json",
   royaltyBasisPoints: 500, // 5%
@@ -219,7 +283,8 @@ const collection = await agent.deployCollection({
 ```typescript
 import { PublicKey } from "@solana/web3.js";
 
-const signature = await agent.trade(
+const signature = await agent.methods.trade(
+  agent,
   new PublicKey("target-token-mint"),
   100, // amount
   new PublicKey("source-token-mint"),
@@ -232,7 +297,8 @@ const signature = await agent.trade(
 ```typescript
 import { PublicKey } from "@solana/web3.js";
 
-const signature = await agent.lendAssets(
+const signature = await agent.methods.lendAssets(
+  agent,
   100 // amount of USDC to lend
 );
 ```
@@ -240,7 +306,8 @@ const signature = await agent.lendAssets(
 ### Stake SOL
 
 ```typescript
-const signature = await agent.stake(
+const signature = await agent.methods.stakeWithJup(
+  agent,
   1 // amount in SOL to stake
 );
 ```
@@ -248,7 +315,8 @@ const signature = await agent.stake(
 ### Stake SOL on Solayer
 
 ```typescript
-const signature = await agent.restake(
+const signature = await agent.methods.stakeWithSolayer(
+  agent,
   1 // amount in SOL to stake
 );
 
@@ -268,9 +336,11 @@ import { PublicKey } from "@solana/web3.js";
     )
   );
 
-  const signature = await agent.sendCompressedAirdrop(
+  const signature = await agent.methods.sendCompressedAirdrop(
+    agent,
     new PublicKey("JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN"), // mint
     42, // amount per recipient
+    9,
     [
       new PublicKey("1nc1nerator11111111111111111111111111111111"),
       // ... add more recipients
@@ -284,9 +354,9 @@ import { PublicKey } from "@solana/web3.js";
 
 ```typescript
 
-const priceFeedID = await agent.getPythPriceFeedID("SOL");
+const priceFeedID = await agent.methods.fetchPythPriceFeedID("SOL");
 
-const price = await agent.getPythPrice(priceFeedID);
+const price = await agent.methods.fetchPythPrice(priceFeedID);
 
 console.log("Price of SOL/USD:", price);
 ```
@@ -296,7 +366,8 @@ console.log("Price of SOL/USD:", price);
 ```typescript
 import { PublicKey } from "@solana/web3.js";
 
-const signature = await agent.openPerpTradeLong({
+const signature = await agent.methods.openPerpTradeLong({
+  agent: agent,
   price: 300, // $300 SOL Max price
   collateralAmount: 10, // 10 jitoSOL in
   collateralMint: new PublicKey("J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn"), // jitoSOL
@@ -311,7 +382,8 @@ const signature = await agent.openPerpTradeLong({
 ```typescript
 import { PublicKey } from "@solana/web3.js";
 
-const signature = await agent.closePerpTradeLong({
+const signature = await agent.methods.closePerpTradeLong({
+  agent: agent,
   price: 200, // $200 SOL price
   tradeMint: new PublicKey("J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn"), // jitoSOL
 });
@@ -321,7 +393,7 @@ const signature = await agent.closePerpTradeLong({
 
 ``` typescript
 
-const { signature } = await agent.closeEmptyTokenAccounts();
+const { signature } = await agent.methods.closeEmptyTokenAccounts(agent);
 ```
 
 ### Create a Drift account
@@ -329,7 +401,13 @@ const { signature } = await agent.closeEmptyTokenAccounts();
 Create a drift account with an initial token deposit.
 
 ```typescript
-const result = await agent.createDriftUserAccount()
+const result = await agent.methods.createDriftUserAccount(
+  agent,
+  // amount of token to deposit
+  100,
+  // token symbol to deposit
+  "USDC"
+)
 ```
 
 ### Create a Drift Vault
@@ -337,7 +415,7 @@ const result = await agent.createDriftUserAccount()
 Create a drift vault.
 
 ```typescript
-const signature = await agent.createDriftVault({
+const signature = await agent.methods.createDriftVault(agent, {
   name: "my-drift-vault",
   marketName: "USDC-SPOT",
   redeemPeriod: 1, // in days
@@ -355,7 +433,7 @@ const signature = await agent.createDriftVault({
 Deposit tokens into a drift vault.
 
 ```typescript
-const signature = await agent.depositIntoDriftVault(100, "41Y8C4oxk4zgJT1KXyQr35UhZcfsp5mP86Z2G7UUzojU")
+const signature = await agent.methods.depositIntoDriftVault(agent, 100, "41Y8C4oxk4zgJT1KXyQr35UhZcfsp5mP86Z2G7UUzojU")
 ```
 
 ### Deposit into your Drift account
@@ -363,7 +441,7 @@ const signature = await agent.depositIntoDriftVault(100, "41Y8C4oxk4zgJT1KXyQr35
 Deposit tokens into your drift account.
 
 ```typescript
-const {txSig} = await agent.depositToDriftUserAccount(100, "USDC")
+const {txSig} = await agent.methods.depositToDriftUserAccount(agent, 100, "USDC")
 ```
 
 ### Derive a Drift Vault address
@@ -371,7 +449,7 @@ const {txSig} = await agent.depositToDriftUserAccount(100, "USDC")
 Derive a drift vault address.
 
 ```typescript
-const vaultPublicKey = await agent.deriveDriftVaultAddress("my-drift-vault")
+const vaultPublicKey = await agent.methods.deriveDriftVaultAddress(agent, "my-drift-vault")
 ```
 
 ### Do you have a Drift account
@@ -379,7 +457,7 @@ const vaultPublicKey = await agent.deriveDriftVaultAddress("my-drift-vault")
 Check if agent has a drift account.
 
 ```typescript
-const {hasAccount, account} = await agent.doesUserHaveDriftAccount()
+const {hasAccount, account} = await agent.methods.doesUserHaveDriftAccount(agent)
 ```
 
 ### Get Drift account information
@@ -387,7 +465,7 @@ const {hasAccount, account} = await agent.doesUserHaveDriftAccount()
 Get drift account information.
 
 ```typescript
-const accountInfo = await agent.driftUserAccountInfo()
+const accountInfo = await agent.methods.driftUserAccountInfo(agent)
 ```
 
 ### Request withdrawal from Drift vault
@@ -395,7 +473,7 @@ const accountInfo = await agent.driftUserAccountInfo()
 Request withdrawal from drift vault.
 
 ```typescript
-const signature = await agent.requestWithdrawalFromDriftVault(100, "41Y8C4oxk4zgJT1KXyQr35UhZcfsp5mP86Z2G7UUzojU")
+const signature = await agent.methods.requestWithdrawalFromDriftVault(agent, 100, "41Y8C4oxk4zgJT1KXyQr35UhZcfsp5mP86Z2G7UUzojU")
 ```
 
 ### Carry out a perpetual trade using a Drift vault
@@ -403,7 +481,7 @@ const signature = await agent.requestWithdrawalFromDriftVault(100, "41Y8C4oxk4zg
 Open a perpetual trade using a drift vault that is delegated to you.
 
 ```typescript
-const signature = await agent.tradeUsingDelegatedDriftVault({
+const signature = await agent.methods.tradeUsingDelegatedDriftVault(agent, {
   vault: "41Y8C4oxk4zgJT1KXyQr35UhZcfsp5mP86Z2G7UUzojU",
   amount: 500,
   symbol: "SOL",
@@ -418,7 +496,7 @@ const signature = await agent.tradeUsingDelegatedDriftVault({
 Open a perpetual trade using your drift account.
 
 ```typescript
-const signature = await agent.tradeUsingDriftPerpAccount({
+const signature = await agent.methods.driftPerpTrade(agent, {
   amount: 500,
   symbol: "SOL",
   action: "long",
@@ -432,7 +510,7 @@ const signature = await agent.tradeUsingDriftPerpAccount({
 Update drift vault parameters.
 
 ```typescript
-const signature = await agent.updateDriftVault({
+const signature = await agent.methods.updateDriftVault(agent, {
   name: "my-drift-vault",
   marketName: "USDC-SPOT",
   redeemPeriod: 1, // in days
@@ -450,7 +528,7 @@ const signature = await agent.updateDriftVault({
 Withdraw tokens from your drift account.
 
 ```typescript
-const {txSig} = await agent.withdrawFromDriftAccount(100, "USDC")
+const {txSig} = await agent.methods.withdrawFromDriftUserAccount(agent, 100, "USDC")
 ```
 
 ### Borrow from Drift
@@ -458,7 +536,7 @@ const {txSig} = await agent.withdrawFromDriftAccount(100, "USDC")
 Borrow tokens from drift.
 
 ```typescript
-const {txSig} = await agent.withdrawFromDriftAccount(1, "SOL", true)
+const {txSig} = await agent.methods.withdrawFromDriftUserAccount(agent, 1, "SOL", true)
 ```
 
 ### Repay Drift loan
@@ -466,7 +544,7 @@ const {txSig} = await agent.withdrawFromDriftAccount(1, "SOL", true)
 Repay a loan from drift.
 
 ```typescript
-const {txSig} = await agent.depositToDriftUserAccount(1, "SOL", true)
+const {txSig} = await agent.methods.depositToDriftUserAccount(agent, 1, "SOL", true)
 ```
 
 ### Withdraw from Drift vault
@@ -474,7 +552,7 @@ const {txSig} = await agent.depositToDriftUserAccount(1, "SOL", true)
 Withdraw tokens from a drift vault after the redemption period has elapsed.
 
 ```typescript
-const signature = await agent.withdrawFromDriftVault( "41Y8C4oxk4zgJT1KXyQr35UhZcfsp5mP86Z2G7UUzojU")
+const signature = await agent.methods.withdrawFromDriftVault(agent,  "41Y8C4oxk4zgJT1KXyQr35UhZcfsp5mP86Z2G7UUzojU")
 ```
 
 ### Update the address a Drift vault is delegated to
@@ -482,7 +560,7 @@ const signature = await agent.withdrawFromDriftVault( "41Y8C4oxk4zgJT1KXyQr35UhZ
 Update the address a drift vault is delegated to.
 
 ```typescript
-const signature = await agent.updateDriftVaultDelegate("41Y8C4oxk4zgJT1KXyQr35UhZcfsp5mP86Z2G7UUzojU", "new-address")
+const signature = await agent.methods.updateDriftVaultDelegate(agent, "41Y8C4oxk4zgJT1KXyQr35UhZcfsp5mP86Z2G7UUzojU", "new-address")
 ```
 
 ### Get Voltr Vault Position Values
@@ -490,7 +568,7 @@ const signature = await agent.updateDriftVaultDelegate("41Y8C4oxk4zgJT1KXyQr35Uh
 Get the current position values and total value of assets in a Voltr vault.
 
 ```typescript
-const values = await agent.voltrGetPositionValues("7opUkqYtxmQRriZvwZkPcg6LqmGjAh1RSEsVrdsGDx5K")
+const values = await agent.methods.voltrGetPositionValues(agent, "7opUkqYtxmQRriZvwZkPcg6LqmGjAh1RSEsVrdsGDx5K")
 ```
 
 ### Deposit into Voltr Strategy
@@ -498,7 +576,8 @@ const values = await agent.voltrGetPositionValues("7opUkqYtxmQRriZvwZkPcg6LqmGjA
 Deposit assets into a specific strategy within a Voltr vault.
 
 ```typescript
-const signature = await agent.voltrDepositStrategy(
+const signature = await agent.methods.voltrDepositStrategy(
+  agent,
   new BN("1000000000"), // amount in base units (e.g., 1 USDC = 1000000)
   "7opUkqYtxmQRriZvwZkPcg6LqmGjAh1RSEsVrdsGDx5K", // vault
   "9ZQQYvr4x7AMqd6abVa1f5duGjti5wk1MHsX6hogPsLk"  // strategy
@@ -510,7 +589,8 @@ const signature = await agent.voltrDepositStrategy(
 Withdraw assets from a specific strategy within a Voltr vault.
 
 ```typescript
-const signature = await agent.voltrWithdrawStrategy(
+const signature = await agent.methods.voltrWithdrawStrategy(
+  agent,
   new BN("1000000000"), // amount in base units (e.g., 1 USDC = 1000000)
   "7opUkqYtxmQRriZvwZkPcg6LqmGjAh1RSEsVrdsGDx5K", // vault
   "9ZQQYvr4x7AMqd6abVa1f5duGjti5wk1MHsX6hogPsLk"  // strategy
@@ -520,7 +600,7 @@ const signature = await agent.voltrWithdrawStrategy(
 ### Get a Solana asset by its ID
 
 ```typescript
-const asset = await agent.getAsset("41Y8C4oxk4zgJT1KXyQr35UhZcfsp5mP86Z2G7UUzojU")
+const asset = await agent.methods.getAsset(agent, "41Y8C4oxk4zgJT1KXyQr35UhZcfsp5mP86Z2G7UUzojU")
 ```
 
 ### Get a price inference from Allora
@@ -528,21 +608,21 @@ const asset = await agent.getAsset("41Y8C4oxk4zgJT1KXyQr35UhZcfsp5mP86Z2G7UUzojU
 Get the price for a given token and timeframe from Allora's API
 
 ```typescript
-const sol5mPrice = await agent.getPriceInference("SOL", "5m");
+const sol5mPrice = await agent.methods.getPriceInference("SOL", "5m");
 console.log("5m price inference of SOL/USD:", sol5mPrice);
 ```
 
 ### List all topics from Allora
 
 ```typescript
-const topics = await agent.getAllTopics();
+const topics = await agent.methods.getAllTopics();
 console.log("Allora topics:", topics);
 ```
 
 ### Get an inference for an specific topic from Allora
 
 ```typescript
-const inference = await agent.getInferenceByTopicId(42);
+const inference = await agent.methods.getInferenceByTopicId(42);
 console.log("Allora inference for topic 42:", inference);
 ```
 
@@ -551,26 +631,10 @@ console.log("Allora inference for topic 42:", inference);
 Simulate a given Switchboard feed. Find or create feeds [here](https://ondemand.switchboard.xyz/solana/mainnet).
 
 ```typescript
-const value = await agent.simulateSwitchboardFeed(
+const value = await agent.methods.simulateSwitchboardFeed(
       "9wcBMATS8bGLQ2UcRuYjsRAD7TPqB1CMhqfueBx78Uj2", // TRUMP/USD
       "http://crossbar.switchboard.xyz");;
 console.log("Simulation resulted in the following value:", value);
-
-### Cross-Chain Swap
-
-```typescript
-import { PublicKey } from "@solana/web3.js";
-
-const signature = await agent.swap(
-  amount: "10",
-  fromChain: "bsc",
-  fromToken: "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359",
-  toChain: "solana",
-  toToken: "0x0000000000000000000000000000000000000000",
-  dstAddr: "0xc2d3024d64f27d85e05c40056674Fd18772dd922",
-);
-
-```
 
 ### Cross-Chain Bridge via deBridge
 
@@ -578,14 +642,14 @@ The Solana Agent Kit supports cross-chain token transfers using deBridge's DLN p
 
 1. Check supported chains:
 ```typescript
-const chains = await agent.getDebridgeSupportedChains();
+const chains = await agent.methods.getDebridgeSupportedChains();
 console.log("Available chains:", chains);
 // Example output: { chains: [{ chainId: "1", chainName: "Ethereum" }, { chainId: "7565164", chainName: "Solana" }] }
 ```
 
 2. Get available tokens (optional):
 ```typescript
-const tokens = await agent.getDebridgeTokensInfo("1", "USDC"); // Search for USDC on Ethereum
+const tokens = await agent.methods.getDebridgeTokensInfo("1", "USDC"); // Search for USDC on Ethereum
 console.log("Available tokens:", tokens);
 // Shows tokens matching 'USDC' on the specified chain
 ```
@@ -601,20 +665,20 @@ const orderInput = {
   dstChainTokenOutRecipient: "0x23C279e58ddF1018C3B9D0C224534fA2a83fb1d2" // ETH recipient
 };
 
-const order = await agent.createDebridgeOrder(orderInput);
+const order = await agent.methods.createDebridgeOrder(orderInput);
 console.log("Order created:", order);
 // Contains transaction data and estimated amounts
 ```
 
 4. Execute the bridge order:
 ```typescript
-const signature = await agent.executeDebridgeOrder(order.tx.data);
+const signature = await agent.methods.executeDebridgeOrder(order.tx.data);
 console.log("Bridge transaction sent:", signature);
 ```
 
 5. Check bridge status:
 ```typescript
-const status = await agent.checkDebridgeTransactionStatus(signature);
+const status = await agent.methods.checkDebridgeTransactionStatus(signature);
 console.log("Bridge status:", status);
 // Shows current status: Created, Fulfilled, etc.
 ```
@@ -627,7 +691,7 @@ Note: When bridging between chains:
 ### Get Token Price Data from CoinGecko
 
 ```typescript
-const priceData = await agent.getTokenPriceData([
+const priceData = await agent.methods.getTokenPriceData([
   "So11111111111111111111111111111111111111112", // SOL
   "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"  // USDC
 ]);
@@ -637,53 +701,153 @@ console.log("Token prices:", priceData);
 ### Get Trending Tokens
 
 ```typescript
-const trendingTokens = await agent.getTrendingTokens();
+const trendingTokens = await agent.methods.getTrendingTokens();
 console.log("Trending tokens:", trendingTokens);
 ```
 
 ### Get Latest Pools
 
 ```typescript
-const latestPools = await agent.getLatestPools();
+const latestPools = await agent.methods.getLatestPools();
 console.log("Latest pools:", latestPools);
 ```
 
 ### Get Token Information
 
 ```typescript
-const tokenInfo = await agent.getTokenInfo("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+const tokenInfo = await agent.methods.getTokenInfo("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
 console.log("Token info:", tokenInfo);
 ```
 
 ### Get Top Gainers
 
 ```typescript
-const topGainers = await agent.getTopGainers("24h", "all");
+const topGainers = await agent.methods.getTopGainers("24h", "all");
 console.log("Top gainers:", topGainers);
 ```
 
 ### Get Trending Pools
 
 ```typescript
-const trendingPools = await agent.getTrendingPools("24h");
+const trendingPools = await agent.methods.getTrendingPools("24h");
 console.log("Trending pools:", trendingPools);
 ```
 
-## DEX API Tools
-
-### OKX DEX Integration
-
-The toolkit provides comprehensive integration with OKX DEX for Solana. Here's how to use the DEX API tools:
-
-### Get Supported Tokens
+### Parse Instruction Data
 
 ```typescript
-const tokens = await agent.getTokens();
-console.log("Supported tokens:", tokens);
-// Returns list of tokens available on OKX DEX
+const parsedData = await agent.methods.parseInstruction(
+  "<programId>",
+  "<instructionData>" // base64
+)
+
+console.log("parsed data:", parsedData)
 ```
 
-### Get DEX Quote
+### Parse Instruction Data
+
+```typescript
+const parsedData = await agent.methods.parseAccount(
+  "<programId>",
+  "<accountData>" // base64
+)
+
+console.log("parsed data:", parsedData)
+```
+
+### Get Sanctum LST Price
+
+```typescript
+const prices = await agent.methods.getSanctumLSTPrice([
+  "bSo13r4TkiE4KumL71LsHTPpL2euBYLFx6h9HP3piy1",
+  "7Q2afV64in6N6SeZsAAB81TJzwDoD6zpqmHkzi9Dcavn"
+  ])
+
+console.log('prices', prices)
+```
+
+### Get Sanctum LST APY
+
+```typescript
+const apys = await agent.methods.getSanctumLSTAPY([
+  "bSo13r4TkiE4KumL71LsHTPpL2euBYLFx6h9HP3piy1",
+  "7Q2afV64in6N6SeZsAAB81TJzwDoD6zpqmHkzi9Dcavn"
+  ])
+
+console.log('apys', apys)
+```
+
+### Get Sanctum LST TVL
+
+```typescript
+const tvls = await agent.methods.getSanctumLSTTVL([
+  "bSo13r4TkiE4KumL71LsHTPpL2euBYLFx6h9HP3piy1",
+  "7Q2afV64in6N6SeZsAAB81TJzwDoD6zpqmHkzi9Dcavn"
+  ])
+
+console.log('tvls', tvls)
+```
+
+### Get Sanctum Owend LST
+
+```typescript
+const lsts = await agent.methods.getSanctumOwnedLST()
+
+console.log('lsts', lsts)
+```
+
+### Add Liquidity to Sanctum Infinite Pool
+
+```typescript
+const txId = await agent.methods.addSanctumLiquidity(
+  "So11111111111111111111111111111111111111112",
+  "1000000000",
+  "1100000000",
+  5000
+)
+
+console.log('txId', txId)
+```
+
+### Remove Liquidity from Sanctum Infinite Pool
+
+```typescript
+const txId = await agent.methods.removeSanctumLiquidity(
+  "So11111111111111111111111111111111111111112",
+  "1000000000",
+  "1100000000",
+  5000
+)
+
+console.log('txId', txId)
+```
+
+### Swap Sanctum LST
+
+```typescript
+const txId = await agent.methods.swapSanctumLST(
+  "So11111111111111111111111111111111111111112",
+  "1000000000",
+  "1100000000",
+  5000,
+  "7Q2afV64in6N6SeZsAAB81TJzwDoD6zpqmHkzi9Dcavn"
+)
+
+console.log('txId', txId)
+```
+
+
+### Get DEX Quote using OKX DEX
+
+Note: To use OKX DEX integration, you need to set up the following environment variables: Get OKX API keys from the [OKX Developer Portal] (https://www.okx.com/web3/build/dev-portal)
+- `OKX_API_KEY`
+- `OKX_SECRET_KEY`
+- `OKX_API_PASSPHRASE`
+- `OKX_PROJECT_ID`
+- `RPC_URL`
+- `SOLANA_PRIVATE_KEY`
+- `SOLANA_WALLET_ADDRESS`
+
 
 ```typescript
 const quote = await agent.getQuote(
@@ -696,7 +860,7 @@ console.log("Swap quote:", quote);
 // Returns quote data with price, fees, and slippage, token symbol, decimals
 ```
 
-### Execute Token Swap
+### Execute Token Swap using OKX DEX
 
 ```typescript
 const swapResult = await agent.executeSwap({
@@ -710,17 +874,6 @@ const swapResult = await agent.executeSwap({
 });
 console.log("Swap executed:", swapResult);
 ```
-
-### Get Chain Data
-
-Note: To use OKX DEX integration, you need to set up the following environment variables: Get OKX API keys from the [OKX Developer Portal] (https://www.okx.com/web3/build/dev-portal)
-- `OKX_API_KEY`
-- `OKX_SECRET_KEY`
-- `OKX_API_PASSPHRASE`
-- `OKX_PROJECT_ID`
-- `RPC_URL`
-- `SOLANA_PRIVATE_KEY`
-- `SOLANA_WALLET_ADDRESS`
 
 ## Examples
 
@@ -780,4 +933,4 @@ Solana Network : EKHTbXpsm6YDgJzMkFxNU1LNXeWcUW7Ezf8mjUNQQ4Pa
 
 ## Security
 
-This toolkit handles private keys and transactions. Always ensure you're using it in a secure environment and never share your private keys.
+This toolkit handles transaction generation, signing and sending, using provided wallets. Always ensure you're using it in a secure environment and never share your private keys.

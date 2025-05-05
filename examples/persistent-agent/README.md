@@ -17,50 +17,19 @@ To use this feature, ensure you have the following:
 
 ## Without persistence
 ```
-Available modes:
-1. chat
-- Interactive chat mode
-2. auto
-- Autonomous action mode
-Choose a mode (enter number or name: 1
-Starting chat mode... Type 'exit' to end.
-Prompt: i am arpit
-Hello Arpit! How can I assist you today?
-Prompt: ^С
-$ ts-node index.ts
-Starting Agent...
-Available modes:
-1. chat
-- Interactive chat mode
-2. auto
-- Autonomous action mode
-Choose a mode (enter number or name): 1
-Starting chat mode... Type 'exit' to end.
-Prompt: do u know my name
-I don't know your name yet. If you'd like, you can share it.
+You: Hi, My name is Arpit
+Agent: Hello Arpit! How can I assist you today?
+You: ^С
+$ pnpm run dev
+You: whats my name
+Agent: I'm sorry, but I don't have access to personal data about users unless it's shared with me in the course of our conversation. If you tell me your name, I'll be happy to use it in our conversation!
 ```
 ## With persistence
 ```
-Available modes:
-1. chat
-- Interactive chat mode
-2. auto
-- Autonomous action mode
-Choose a mode (enter number or name: 1
-Starting chat mode... Type 'exit' to end.
-Prompt: i am arpit
-Hello Arpit! How can I assist you today?
-Prompt: ^С
-$ ts-node index.ts
-Starting Agent...
-Available modes:
-1. chat
-- Interactive chat mode
-2. auto
-- Autonomous action mode
-Choose a mode (enter number or name): 1
-Starting chat mode... Type 'exit' to end.
-Prompt: do u know my name
-Yes, you mentioned that your name is Arpit. How can I help you today? 
+You: i, My name is Arpit
+Agent: Hello Arpit! How can I assist you today?
+You: ^С
+$ pnpm run dev
+You: Do you know my name?
+Agent: Yes, you just mentioned that your name is Arpit. How can I help you today?
 ```
-

@@ -3,7 +3,6 @@ export const fetchCache = 'force-no-store';
 export const maxDuration = 60; // can use 300 with vercel premium
 
 import { Bot, webhookCallback } from 'grammy';
-import { SolanaAgentKit, createSolanaTools } from "solana-agent-kit";
 import { ChatOpenAI } from "@langchain/openai";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { HumanMessage } from "@langchain/core/messages";
@@ -12,6 +11,13 @@ import { getFirestore, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore
 import { bs58 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { Keypair } from '@solana/web3.js';
 import { PostgresSaver } from "@langchain/langgraph-checkpoint-postgres";
+import NFTPlugin from "@solana-agent-kit/plugin-nft";
+import TokenPlugin from "@solana-agent-kit/plugin-token";
+import {
+  KeypairWallet,
+  SolanaAgentKit,
+  createLangchainTools,
+} from "solana-agent-kit";
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 if (!token) throw new Error('TELEGRAM_BOT_TOKEN environment variable not found.');
@@ -53,17 +59,19 @@ async function getOrCreateUserKeyPair(userId: string) {
 async function initializeAgent(userId: string, keyPair: any) {
   try {
     const llm = new ChatOpenAI({
-      modelName: "gpt-4o-mini",
-      temperature: 0.7,
+      model: "gpt-4o",
+      temperature: 0,
+      apiKey: process.env.OPENAI_API_KEY as string,
     });
 
-    const solanaKit = new SolanaAgentKit(
-      keyPair.privateKey,
-      process.env.RPC_URL,
-      process.env.OPENAI_API_KEY!
-    );
+    const wallet = new KeypairWallet(keyPair, process.env.RPC_URL as string);
+    const solanaKit = new SolanaAgentKit(wallet, process.env.RPC_URL!, {
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    })
+      .use(TokenPlugin)
+      .use(NFTPlugin);
 
-    const tools = createSolanaTools(solanaKit);
+    const tools = createLangchainTools(solanaKit, solanaKit.actions);
     await checkpointer.setup();
     const config = { configurable: { thread_id: userId } };
     const agent = createReactAgent({
@@ -86,8 +94,9 @@ async function initializeAgent(userId: string, keyPair: any) {
     throw error;
   }
 }
+
 // Telegram bot handler
-bot.on('message:text', async (ctx) => {
+bot.on('message:text', async (ctx: any) => {
   const userId = ctx.from?.id.toString();
   if (!userId) return;
   const botUsername = `@${ctx.me.username}`;
@@ -105,16 +114,14 @@ bot.on('message:text', async (ctx) => {
     await ctx.reply("Your private key is:");
     await ctx.reply(`${String(keyPair.privateKey)}`);
     return;
-  }
-  else if (userDocSnap.exists() && ctx.chat.type == 'private') {
+  } else if (userDocSnap.exists() && ctx.chat.type == 'private') {
     const keyPair = await getOrCreateUserKeyPair(userId);
     await ctx.reply("Looks like you already have a wallet. Your public key is:");
     await ctx.reply(`${String(keyPair.publicKey)}`);
     await ctx.reply("Your private key is:");
     await ctx.reply(`${String(keyPair.privateKey)}`);
     return;
-  }
-  else if (!userDocSnap.exists()) {
+  } else if (!userDocSnap.exists()) {
     await ctx.reply("Looks like you haven't got a wallet yet. Please start a private chat with me to get your wallet.", { reply_to_message_id: ctx.message.message_id });
     return;
   }
@@ -145,8 +152,7 @@ bot.on('message:text', async (ctx) => {
       await ctx.reply("I'm sorry, an error occurred while processing your request.", { reply_to_message_id: ctx.message.message_id });
       await updateDoc(userDocRef, { inProgress: false });
     }
-  }
-  finally {
+  } finally {
     await updateDoc(userDocRef, { inProgress: false });
   }
 });

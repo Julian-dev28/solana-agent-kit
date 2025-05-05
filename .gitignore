@@ -6,5 +6,10 @@ node_modules
 .vscode
 
 .DS_Store
+
+.husky
 .turbo
 .turbo/
+.rollup.*/
+.rollup/
+tsconfig.tsbuildinfo
