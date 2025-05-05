@@ -277,7 +277,6 @@ export async function executeSwap(
     // Clean the wallet address
     const walletAddress = String(userWalletAddress || agent.wallet_address.toString()).trim();
     
-    console.log("\nDebug - OKX DEX Swap Execution:");
     console.log("  From token:", fromAddress);
     console.log("  To token:", toAddress);
     console.log("  Amount:", amount);
@@ -288,7 +287,7 @@ export async function executeSwap(
     const dexClient = initDexClient(agent);
 
     // Get a quote first
-    console.log("\nDebug - Getting quote for swap...");
+    console.log("\nGetting quote for swap...");
     const quote = await dexClient.dex.getQuote({
       chainId: '501',
       fromTokenAddress: fromAddress,
@@ -297,7 +296,7 @@ export async function executeSwap(
       slippage: autoSlippage ? "0" : slippage
     });
 
-    console.log("\nDebug - Quote response status:", quote.code, quote.msg);
+    console.log("\nQuote response status:", quote.code, quote.msg);
     
     // Validate the quote
     if (!quote.data || !quote.data[0]) {
@@ -305,7 +304,7 @@ export async function executeSwap(
     }
 
     const quoteData = quote.data[0];
-    console.log("\nDebug - Quote data:", {
+    console.log("\nQuote data:", {
       fromToken: quoteData.fromToken?.tokenSymbol || "Unknown",
       toToken: quoteData.toToken?.tokenSymbol || "Unknown",
       fromAmount: quoteData.fromTokenAmount,
@@ -318,7 +317,7 @@ export async function executeSwap(
     const humanFromAmount = parseFloat(quoteData.fromTokenAmount) / Math.pow(10, fromDecimal);
     const humanToAmount = parseFloat(quoteData.toTokenAmount) / Math.pow(10, toDecimal);
 
-    console.log("\nDebug - Executing swap transaction...");
+    console.log("\nExecuting swap transaction...");
     
     try {
       // Use the standard SDK method instead of trying to customize the request
@@ -333,7 +332,7 @@ export async function executeSwap(
         userWalletAddress: walletAddress
       });
 
-      console.log("\nDebug - Swap result:", JSON.stringify(swapResult, null, 2));
+      console.log("\nSwap result:", JSON.stringify(swapResult, null, 2));
 
       return {
         status: "success",
@@ -401,11 +400,6 @@ async function initializeAgent() {
     if (!isValidBase58(privateKey)) {
       throw new Error("Invalid base58 format for private key");
     }
-    
-    // Debug logging (only show first/last 4 chars of private key for security)
-    console.log("\nDebug - Initialization:");
-    console.log("  Private key length:", privateKey.length);
-    console.log("  Private key format:", `${privateKey.slice(0, 4)}...${privateKey.slice(-4)}`);
     
     // Clean up and validate wallet address if provided
     if (process.env.OKX_SOLANA_WALLET_ADDRESS) {
@@ -515,8 +509,6 @@ export async function getQuote(agent: SolanaAgentKit, fromAddress: string, toAdd
   console.log(`\nGetting quote for swapping ${humanReadable} to ${toInfo?.symbol || toAddress}...`);
   
   try {
-    // Debug logging for amount validation
-    console.log("\nDebug - Amount validation:");
     console.log("  Raw amount:", amount);
     console.log("  Formatted amount:", formattedAmount);
     console.log("  Human readable:", humanReadable);
@@ -535,15 +527,14 @@ export async function getQuote(agent: SolanaAgentKit, fromAddress: string, toAdd
       };
     }
 
-    // Log the raw quote for debugging
-    console.log("\nDebug - Raw quote response:", JSON.stringify(quote, null, 2));
+    console.log("\nRaw quote response:", JSON.stringify(quote, null, 2));
 
     formatQuoteResult(quote, fromAddress, toAddress);
     return quote;
   } catch (err) {
     console.error("\nError getting quote:", err);
     if (err instanceof Error) {
-      console.log("Debug - Error details:", {
+      console.log("Error details:", {
         message: err.message,
         stack: err.stack,
         // @ts-ignore
@@ -682,7 +673,6 @@ Available commands:
 
       if (input.toLowerCase() === 'confirm') {
         if (currentQuote && swapParams.fromAddress && swapParams.toAddress && swapParams.amount) {
-          console.log("\nDebug - Swap parameters:");
           console.log("  From address:", swapParams.fromAddress);
           console.log("  To address:", swapParams.toAddress);
           console.log("  Amount:", swapParams.amount);

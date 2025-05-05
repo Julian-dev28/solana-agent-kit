@@ -1341,8 +1341,8 @@ export class SolanaAgentKit {
    * @param chainId Chain ID to query liquidity for
    * @returns Liquidity data
    */
-  async getOkxLiquidity(chainId: string) {
-    return getLiquidity(this, chainId);
+  async getOkxLiquidity() {
+    return getLiquidity(this);
   }
 
   /**
