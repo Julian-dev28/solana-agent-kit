@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { SolanaAgentKit, createSolanaTools } from "../../src";
+import { SolanaAgentKit, createSolanaTools } from "../../packages/core/src";
 
 const agent = new SolanaAgentKit(
   process.env.SOLANA_PRIVATE_KEY!,

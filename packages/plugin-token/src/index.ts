@@ -44,6 +44,15 @@ import closeAccountsUsingSolutiofiAction from "./solutiofi/actions/closeAccounts
 import mergeTokensUsingSolutiofiAction from "./solutiofi/actions/mergeTokens";
 import spreadTokenUsingSolutiofiAction from "./solutiofi/actions/spreadToken";
 
+// okx
+import { 
+  okxDexChainDataAction,
+  okxDexLiquidityAction,
+  okxDexQuoteAction,
+  okxDexSwapAction
+} from "./okx";
+
+
 // Import all tools
 import {
   getTokenAddressFromTicker,
@@ -143,16 +152,57 @@ const TokenPlugin = {
     closeAccountsUsingSolutiofiAction,
     mergeTokensUsingSolutiofiAction,
     walletAddressAction,
+    // OKX actions
+    okxDexChainDataAction,
+    okxDexLiquidityAction,
+    okxDexQuoteAction,
+    okxDexSwapAction
   ],
 
   // Initialize function
   initialize: function (agent: SolanaAgentKit): void {
+    console.log("Initializing TokenPlugin...");
+    console.log("Plugin methods before initialization:", Object.keys(this.methods));
+    console.log("Agent methods before initialization:", Object.keys(agent.methods || {}));
+    console.log("Plugin actions before initialization:", this.actions.map(a => a.name));
+    
     // Initialize all methods with the agent instance
-    for (const [methodName, method] of Object.entries(this.methods)) {
+    const methods = this.methods as Record<string, Function>;
+    for (const [methodName, method] of Object.entries(methods)) {
       if (typeof method === "function") {
-        this.methods[methodName] = method.bind(null, agent);
+        console.log(`Binding method: ${methodName}`);
+        try {
+          // Bind the method to the agent instance and store it back in the methods object
+          this.methods[methodName] = method.bind(null, agent);
+          // Also ensure it's available on the agent's methods
+          (agent.methods as Record<string, Function>)[methodName] = this.methods[methodName];
+          console.log(`Successfully bound ${methodName}`);
+        } catch (error) {
+          console.error(`Failed to bind ${methodName}:`, error);
+        }
       }
     }
+    
+    // Ensure actions are properly added to the agent
+    if (!agent.actions) {
+      agent.actions = [];
+    }
+    
+    // Add all actions to the agent
+    for (const action of this.actions) {
+      if (!agent.actions.some(a => a.name === action.name)) {
+        agent.actions.push(action);
+        console.log(`Added action: ${action.name}`);
+      }
+    }
+    
+    // Verify OKX actions are present
+    const okxActions = agent.actions.filter(a => a.name.startsWith('OKX_DEX_'));
+    console.log("OKX actions found:", okxActions.map(a => a.name));
+    
+    console.log("Plugin methods after initialization:", Object.keys(this.methods));
+    console.log("Agent methods after initialization:", Object.keys(agent.methods || {}));
+    console.log("Agent actions after initialization:", agent.actions.map(a => a.name));
   },
 } satisfies Plugin;
 

@@ -1,67 +1,51 @@
-import dotenv from "dotenv";
-import { SolanaAgentKit } from "../../src/agent";
-import { OKXLiquiditySource, OKXResponse } from "../../src/types";
+import { describe, expect, test } from "@jest/globals";
+import { SolanaAgentKit } from "../../packages/core/src/agent";
+import { OKXLiquiditySource, OKXResponse } from "../../packages/core/src/types";
+import { getOkxLiquidity } from "../../packages/plugin-token/src/okx";
+import { Connection } from "@solana/web3.js";
+import { Keypair } from "@solana/web3.js";
+import { KeypairWallet } from "../../packages/core/src/utils/keypairWallet";
+import TokenPlugin from "../../packages/plugin-token/src/index";
+describe("OKX DEX Liquidity Tests", () => {
+  let agent: SolanaAgentKit<Record<string, never>>;
 
-dotenv.config();
+  beforeEach(() => {
+    const rpcUrl = process.env.RPC_URL || "";
+    const connection = new Connection(rpcUrl);
+    const keypair = Keypair.fromSecretKey(Buffer.from(process.env.SOLANA_PRIVATE_KEY || "", "base64"));
+    const wallet = new KeypairWallet(keypair, connection.rpcEndpoint);
+    
+    agent = new SolanaAgentKit(wallet, rpcUrl, {
+      OKX_API_KEY: process.env.OKX_API_KEY,
+      OKX_SECRET_KEY: process.env.OKX_SECRET_KEY,
+      OKX_API_PASSPHRASE: process.env.OKX_API_PASSPHRASE,
+      OKX_PROJECT_ID: process.env.OKX_PROJECT_ID,
+      OKX_SOLANA_WALLET_ADDRESS: process.env.OKX_SOLANA_WALLET_ADDRESS,
+      OKX_SOLANA_PRIVATE_KEY: process.env.OKX_SOLANA_PRIVATE_KEY
+    });
 
-async function testOkxDexLiquidity() {
-  console.log("Testing OKX DEX Liquidity API...");
+    agent.use(TokenPlugin);
+  });
 
-  // Create a configuration object with explicit defaults for optional values
-  const config = {
-    OPENAI_API_KEY: process.env.OPENAI_API_KEY!,
-    // Add defaults for the OKX configuration values to avoid undefined
-    OKX_API_KEY: process.env.OKX_API_KEY || "",
-    OKX_SECRET_KEY: process.env.OKX_SECRET_KEY || "",
-    OKX_API_PASSPHRASE: process.env.OKX_API_PASSPHRASE || "",
-    OKX_PROJECT_ID: process.env.OKX_PROJECT_ID || "",
-  };
+  test("should get OKX DEX liquidity", async () => {
+    console.log("Testing OKX DEX Liquidity API...");
+    console.log("Wallet address:", agent.wallet.publicKey.toString());
 
-  // Initialize SolanaAgentKit with proper config
-  const agent = new SolanaAgentKit(
-    process.env.SOLANA_PRIVATE_KEY!,
-    process.env.RPC_URL!,
-    config,
-  );
+    const response = await (agent.methods as any).getOkxLiquidity();
+    expect(response).toBeDefined();
+    expect(response.data).toBeDefined();
+    expect(Array.isArray(response.data)).toBe(true);
 
-  console.log("Wallet address:", agent.wallet_address.toString());
+    const liquiditySources = response.data;
+    expect(liquiditySources.length).toBeGreaterThan(0);
 
-  try {
-    // Test getting liquidity information for Ethereum (chainId: 1)
-    console.log("Getting liquidity information from OKX DEX for Ethereum...");
-    const chainId = "1"; // Ethereum chain ID
-    const response = (await agent.getOkxLiquidity(
-      chainId,
-    )) as OKXResponse<OKXLiquiditySource>;
+    // Test first few items
+    const testItems = liquiditySources.slice(0, 3);
+    testItems.forEach((source: OKXLiquiditySource) => {
+      expect(source.id).toBeDefined();
+      expect(source.logo).toBeDefined();
+    });
 
-    if (response.code === "0" && response.data) {
-      console.log("Successfully got liquidity information from OKX DEX API");
-      console.log(`Found ${response.data.length} liquidity sources`);
-
-      // Print liquidity source information
-      console.log("\nLiquidity sources (showing first 5):");
-      response.data.slice(0, 5).forEach((source: OKXLiquiditySource) => {
-        console.log(`- ${source.name}`);
-        console.log(`  ID: ${source.id}`);
-        console.log(`  Logo: ${source.logo}`);
-      });
-
-      console.log("\nTotal available liquidity sources:", response.data.length);
-      console.log("Liquidity test passed!");
-    } else {
-      console.log("Failed to get liquidity information.");
-      console.log("Response code:", response.code);
-      console.log("Response message:", response.msg);
-      console.log("Liquidity test failed!");
-    }
-  } catch (error) {
-    console.error(
-      "Error getting liquidity information from OKX DEX API:",
-      error,
-    );
-    console.log("Liquidity test failed!");
-  }
-}
-
-// Run the test
-testOkxDexLiquidity().catch(console.error);
+    console.log(`Found ${liquiditySources.length} liquidity sources`);
+  });
+});

@@ -1,8 +1,7 @@
-// src/actions/okx-dex/chains_action.ts
-import { Action } from "../../types/action";
-import { SolanaAgentKit } from "../../agent";
+// src/actions/okx-dex/chain_data_action.ts
+import { Action } from "solana-agent-kit";
 import { z } from "zod";
-import { getChainData } from "../../tools/okx-dex";
+import { getOkxChainData } from "../tools";
 
 const okxDexChainDataAction: Action = {
   name: "OKX_DEX_CHAIN_DATA",
@@ -14,25 +13,23 @@ const okxDexChainDataAction: Action = {
       output: {
         status: "success",
         summary: {
-          chains: [
-            {
-              symbol: "SOL",
-              name: "Solana",
-              address: "So11111111111111111111111111111111111111112"
-            }
-          ]
+          chainData: {
+            chainId: "501",
+            chainName: "Solana",
+            dexTokenApproveAddress: "6JQYBf383aJYqZu5nimYWYKZQe18ZH8JHjWK215JF13"
+          }
         }
       },
       explanation: "Getting chain data from OKX DEX"
     }
   ]],
   schema: z.object({}),
-  handler: async (agent: SolanaAgentKit, input: Record<string, any>) => {
-    const chains = await getChainData(agent);
+  handler: async (agent: any) => {
+    const chainData = await getOkxChainData(agent);
     return {
       status: "success",
       summary: {
-        chains: chains
+        chainData
       }
     };
   }

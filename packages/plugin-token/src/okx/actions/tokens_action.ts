@@ -1,9 +1,8 @@
-import { Action } from "../../types/action";
-import { SolanaAgentKit } from "../../agent";
+import { Action, SolanaAgentKit } from "solana-agent-kit";
 import { z } from "zod";
-import { executeSwap, getQuote, getTokens } from "../../tools/okx-dex";
+import { executeOkxSwap, getOkxQuote, getOkxTokens } from "../tools";
 
-const okxDexTokensAction: Action = {
+export const okxDexTokensAction: Action = {
   name: "OKX_DEX_TOKENS",
   similes: ["list tokens", "okx dex tokens"],
   description: "List all tokens supported by OKX DEX.",
@@ -31,8 +30,8 @@ const okxDexTokensAction: Action = {
     }
   ]],
   schema: z.object({}),
-  handler: async (agent: SolanaAgentKit, input: Record<string, any>) => {
-    const tokens = await getTokens(agent);
+  handler: async (agent: any, input: Record<string, any>) => {
+    const tokens = await getOkxTokens(agent);
     return {
       status: "success",
       summary: {
@@ -41,6 +40,4 @@ const okxDexTokensAction: Action = {
     };  
   }
 };
-
-export default okxDexTokensAction;
 

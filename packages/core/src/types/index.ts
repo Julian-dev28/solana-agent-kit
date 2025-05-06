@@ -28,6 +28,12 @@ export interface Config {
   COINGECKO_PRO_API_KEY?: string;
   COINGECKO_DEMO_API_KEY?: string;
   MESSARI_API_KEY?: string;
+  OKX_API_KEY?: string;
+  OKX_SECRET_KEY?: string;
+  OKX_API_PASSPHRASE?: string;
+  OKX_PROJECT_ID?: string;
+  OKX_SOLANA_WALLET_ADDRESS?: string;
+  OKX_SOLANA_PRIVATE_KEY?: string;
 }
 
 export interface PumpFunTokenOptions {
@@ -201,4 +207,55 @@ export interface PriorityFeeResponse {
     transaction: string;
     options: { priorityLevel: string };
   }>;
+}
+
+// OKX DEX Types
+export interface OKXToken {
+  chainId: string;
+  address: string;
+  symbol: string;
+  decimals: number;
+  name: string;
+}
+
+export interface OKXChain {
+  chainId: string;
+  name: string;
+  icon: string;
+  tokenSymbol: string;
+  chainName: string;
+  dexTokenApproveAddress: string;
+}
+
+export interface OKXLiquiditySource {
+  name: string;
+  icon: string;
+  id: string;
+  logo: string;
+}
+
+export interface OKXQuoteData extends Array<{
+  inToken: OKXToken;
+  outToken: OKXToken;
+  inAmount: string;
+  outAmount: string;
+  price: string;
+  priceImpact: string;
+  liquiditySources: OKXLiquiditySource[];
+  gasFee: string;
+}> {}
+
+export interface OKXResponse<T> {
+  code: string;
+  msg: string;
+  data: T;
+}
+
+export interface OKXSwapResult {
+  signature: string;
+  inAmount: string;
+  outAmount: string;
+  price: string;
+  priceImpact: string;
+  gasFee: string;
 }

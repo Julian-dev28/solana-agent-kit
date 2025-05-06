@@ -1,62 +1,57 @@
-import dotenv from "dotenv";
-import { SolanaAgentKit } from "../../src/agent";
-import { OKXQuoteData, OKXResponse } from "../../src/types";
+import { describe, expect, test } from "@jest/globals";
+import { SolanaAgentKit } from "../../packages/core/src/agent";
+import { OKXQuoteData, OKXResponse } from "../../packages/core/src/types";
+import TokenPlugin from "../../packages/plugin-token/src";
+import { Connection } from "@solana/web3.js";
+import { Keypair } from "@solana/web3.js";
+import { KeypairWallet } from "../../packages/core/src/utils/keypairWallet";
 
-dotenv.config();
+describe("OKX DEX Quote Tests", () => {
+  let agent: SolanaAgentKit<typeof TokenPlugin>;
 
-async function testOkxDexQuote() {
-  console.log("Testing OKX DEX Quote API...");
+  beforeEach(() => {
+    const connection = new Connection(process.env.RPC_URL || "");
+    const keypair = Keypair.fromSecretKey(Buffer.from(process.env.SOLANA_PRIVATE_KEY || "", "base64"));
+    const wallet = new KeypairWallet(keypair, process.env.RPC_URL || "");
+    
+    agent = new SolanaAgentKit(wallet, process.env.RPC_URL || "", {
+      OKX_API_KEY: process.env.OKX_API_KEY,
+      OKX_SECRET_KEY: process.env.OKX_SECRET_KEY,
+      OKX_API_PASSPHRASE: process.env.OKX_API_PASSPHRASE,
+      OKX_PROJECT_ID: process.env.OKX_PROJECT_ID,
+        OKX_SOLANA_WALLET_ADDRESS: process.env.OKX_SOLANA_WALLET_ADDRESS,
+      OKX_SOLANA_PRIVATE_KEY: process.env.OKX_SOLANA_PRIVATE_KEY
+    });
+    agent.use(TokenPlugin);
+  });
 
-  // Create a configuration object with explicit defaults for optional values
-  const config = {
-    OPENAI_API_KEY: process.env.OPENAI_API_KEY!,
-    // Add defaults for the OKX configuration values to avoid undefined
-    OKX_API_KEY: process.env.OKX_API_KEY || "",
-    OKX_SECRET_KEY: process.env.OKX_SECRET_KEY || "",
-    OKX_API_PASSPHRASE: process.env.OKX_API_PASSPHRASE || "",
-    OKX_PROJECT_ID: process.env.OKX_PROJECT_ID || "",
-  };
+  test("should get OKX DEX quote", async () => {
+    console.log("Testing OKX DEX Quote API...");
+    console.log("Wallet address:", agent.wallet.publicKey.toString());
 
-  // Initialize SolanaAgentKit with proper config
-  const agent = new SolanaAgentKit(
-    process.env.SOLANA_PRIVATE_KEY!,
-    process.env.RPC_URL!,
-    config,
-  );
+    const fromTokenAddress = "So11111111111111111111111111111111111111112"; // SOL
+    const toTokenAddress = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"; // USDC
+    const amount = "1000000000"; // 1 SOL
 
-  console.log("Wallet address:", agent.wallet_address.toString());
+    const response = await (agent.methods as any).getOkxQuote(fromTokenAddress, toTokenAddress, amount);
+    expect(response).toBeDefined();
+    expect(response.data).toBeDefined();
+    expect(Array.isArray(response.data)).toBe(true);
 
-  try {
-    // Test getting a quote for SOL -> USDC
-    console.log("Getting quote for SOL -> USDC...");
+    const quotes = response.data;
+    expect(quotes.length).toBeGreaterThan(0);
 
-    // SOL and USDC token addresses
-    const solAddress = "So11111111111111111111111111111111111111112";
-    const usdcAddress = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+    // Test first quote
+    const quote = quotes[0];
+    expect(quote.inToken).toBeDefined();
+    expect(quote.outToken).toBeDefined();
+    expect(quote.inAmount).toBeDefined();
+    expect(quote.outAmount).toBeDefined();
+    expect(quote.price).toBeDefined();
+    expect(quote.priceImpact).toBeDefined();
+    expect(Array.isArray(quote.liquiditySources)).toBe(true);
+    expect(quote.gasFee).toBeDefined();
 
-    // Amount in lamports (0.01 SOL = 10,000,000 lamports)
-    const amount = "10000000";
-
-    const quote = (await agent.getOkxQuote(
-      solAddress,
-      usdcAddress,
-      amount,
-      "0.5", // 0.5% slippage
-    )) as OKXResponse<OKXQuoteData>;
-
-    if (quote && quote.data) {
-      console.log("Successfully got quote from OKX DEX API");
-      console.log("Quote details:", JSON.stringify(quote.data[0], null, 2));
-      console.log("Quote test passed!");
-    } else {
-      console.log("Failed to get quote. Response:", quote);
-      console.log("Quote test failed!");
-    }
-  } catch (error) {
-    console.error("Error getting quote from OKX DEX API:", error);
-    console.log("Quote test failed!");
-  }
-}
-
-// Run the test
-testOkxDexQuote().catch(console.error);
+    console.log(`Found ${quotes.length} quotes`);
+  });
+});

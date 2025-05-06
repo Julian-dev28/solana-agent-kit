@@ -1,5 +1,5 @@
-import { SolanaAgentKit } from "../../index";
 import { initDexClient } from "./utils";
+import { SolanaAgentKit } from "solana-agent-kit";
 
 /**
  * Get quote for token swap on OKX DEX
@@ -10,27 +10,24 @@ import { initDexClient } from "./utils";
  * @param slippage Slippage tolerance (optional)
  * @returns Quote response
  */
-export async function getQuote(
+export async function getOkxQuote(
   agent: SolanaAgentKit,
   fromTokenAddress: string,
   toTokenAddress: string,
   amount: string,
-  slippage: string = "0.5"
-): Promise<any> {
+  slippage: string
+) {
   try {
-    const dexClient = initDexClient(agent);
-    const quote = await dexClient.dex.getQuote({
+    const dexClient = await initDexClient(agent);
+    const response = await dexClient.dex.getQuote({
       chainId: '501',
       fromTokenAddress,
       toTokenAddress,
       amount,
       slippage
     });
-    return quote;
+    return response;
   } catch (error: any) {
-    return {
-      status: "error",
-      message: error.message || "Failed to get quote"
-    };
+    throw new Error(`Failed to get OKX quote: ${error.message}`);
   }
 }

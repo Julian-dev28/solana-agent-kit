@@ -1,69 +1,58 @@
-import {
-  ComputeBudgetProgram,
-  TransactionMessage,
-  VersionedTransaction,
-} from "@solana/web3.js";
-import dotenv from "dotenv";
-import { SolanaAgentKit } from "../../src/agent";
-import { OKXQuoteData, OKXResponse } from "../../src/types";
+import { describe, expect, test } from "@jest/globals";
+import { SolanaAgentKit } from "../../packages/core/src/agent";
+import { OKXQuoteData, OKXResponse } from "../../packages/core/src/types";
+import TokenPlugin from "../../packages/plugin-token/src";
+import { OKXPluginMethods } from "../../packages/plugin-token/src/okx";
+import { Connection } from "@solana/web3.js";
+import { Keypair } from "@solana/web3.js";
+import { KeypairWallet } from "../../packages/core/src/utils/keypairWallet";
 
-dotenv.config();
+describe("OKX DEX Simulate Tests", () => {
+  let agent: SolanaAgentKit<typeof TokenPlugin>;
 
-async function testOkxDexSimulation() {
-  console.log("Testing OKX DEX Simulation");
-
-  const agent = new SolanaAgentKit(
-    process.env.SOLANA_PRIVATE_KEY!,
-    process.env.RPC_URL!,
-    {
-      OKX_API_KEY: process.env.OKX_API_KEY || "",
-      OKX_SECRET_KEY: process.env.OKX_SECRET_KEY || "",
-      OKX_API_PASSPHRASE: process.env.OKX_API_PASSPHRASE || "",
-      OKX_PROJECT_ID: process.env.OKX_PROJECT_ID || "",
-    },
-  );
-
-  try {
-    // Get quote for SOL -> USDC
-    const quote = (await agent.getOkxQuote(
-      "So11111111111111111111111111111111111111112", // SOL
-      "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
-      "10000000", // 0.01 SOL
-    )) as OKXResponse<OKXQuoteData>;
-
-    if (!quote?.data?.[0]) throw new Error("Failed to get quote");
-
-    // Create and simulate transaction
-    const { blockhash } =
-      await agent.connection.getLatestBlockhash("finalized");
-    const computeBudgetIx = ComputeBudgetProgram.setComputeUnitLimit({
-      units: 300000,
+  beforeEach(() => {
+    const connection = new Connection(process.env.RPC_URL || "");
+    const keypair = Keypair.fromSecretKey(Buffer.from(process.env.SOLANA_PRIVATE_KEY || "", "base64"));
+    const wallet = new KeypairWallet(keypair, process.env.RPC_URL || "");
+    
+    agent = new SolanaAgentKit(wallet, process.env.RPC_URL || "", {
+      OKX_API_KEY: process.env.OKX_API_KEY,
+      OKX_SECRET_KEY: process.env.OKX_SECRET_KEY,
+      OKX_API_PASSPHRASE: process.env.OKX_API_PASSPHRASE,
+      OKX_PROJECT_ID: process.env.OKX_PROJECT_ID,
+        OKX_SOLANA_WALLET_ADDRESS: process.env.OKX_SOLANA_WALLET_ADDRESS,
+      OKX_SOLANA_PRIVATE_KEY: process.env.OKX_SOLANA_PRIVATE_KEY
     });
+    agent.use(TokenPlugin);
+  });
 
-    const transaction = new VersionedTransaction(
-      new TransactionMessage({
-        payerKey: agent.wallet_address,
-        recentBlockhash: blockhash,
-        instructions: [computeBudgetIx],
-      }).compileToV0Message(),
-    );
+  test("should simulate OKX DEX swap", async () => {
+    console.log("Testing OKX DEX Simulate API...");
+    console.log("Wallet address:", agent.wallet.publicKey.toString());
 
-    const simulation = await agent.connection.simulateTransaction(transaction);
+    const fromTokenAddress = "So11111111111111111111111111111111111111112"; // SOL
+    const toTokenAddress = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"; // USDC
+    const amount = "1000000000"; // 1 SOL
 
-    console.log(
-      "Simulation status:",
-      simulation.value.err ? "Failed" : "Success",
-    );
-    console.log("Compute units:", simulation.value.unitsConsumed || 0);
+    const response = await (agent.methods as unknown as OKXPluginMethods).getOkxQuote(fromTokenAddress, toTokenAddress, amount);
+    expect(response).toBeDefined();
+    expect(response.data).toBeDefined();
+    expect(Array.isArray(response.data)).toBe(true);
 
-    return { simulation, quote: quote.data[0] };
-  } catch (error) {
-    console.error(
-      "Simulation failed:",
-      error instanceof Error ? error.message : error,
-    );
-    throw error;
-  }
-}
+    const quotes = response.data;
+    expect(quotes.length).toBeGreaterThan(0);
 
-testOkxDexSimulation().catch(console.error);
+    // Test first quote
+    const quote = quotes[0];
+    expect(quote.inToken).toBeDefined();
+    expect(quote.outToken).toBeDefined();
+    expect(quote.inAmount).toBeDefined();
+    expect(quote.outAmount).toBeDefined();
+    expect(quote.price).toBeDefined();
+    expect(quote.priceImpact).toBeDefined();
+    expect(Array.isArray(quote.liquiditySources)).toBe(true);
+    expect(quote.gasFee).toBeDefined();
+
+    console.log(`Found ${quotes.length} quotes`);
+  });
+});

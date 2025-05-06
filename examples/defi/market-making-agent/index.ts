@@ -5,7 +5,8 @@ import { ChatOpenAI } from "@langchain/openai";
 import * as dotenv from "dotenv";
 import * as fs from "fs";
 import * as readline from "readline";
-import { createSolanaTools, SolanaAgentKit } from "../../src";
+import { SolanaAgentKit } from "../../../packages/core/src";
+import TokenPlugin from "../../../packages/plugin-token/src";
 
 dotenv.config();
 
