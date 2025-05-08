@@ -1,14 +1,15 @@
-import { SolanaAgentKit } from "../../src/agent";
+import { SolanaAgentKit, KeypairWallet, createLangchainTools } from "solana-agent-kit";
+import { Keypair } from "@solana/web3.js";
 import { ChatOpenAI } from "@langchain/openai";
+import { AgentExecutor, createOpenAIFunctionsAgent } from "langchain/agents";
 import { HumanMessage } from "@langchain/core/messages";
-import { createReactAgent } from "@langchain/langgraph/prebuilt";
-import { tool } from "@langchain/core/tools";
-import { z } from "zod";
-import * as dotenv from "dotenv";
+import TokenPlugin from "@solana-agent-kit/plugin-token";
+import bs58 from "bs58";
+import dotenv from "dotenv";
 import * as readline from "readline";
 import { initDexClient } from "../../src/tools/okx-dex/utils";
-import bs58 from 'bs58';
 
+// Load environment variables
 dotenv.config();
 
 export const OKX_SOLANA_WALLET_ADDRESS = process.env.OKX_SOLANA_WALLET_ADDRESS || "";
@@ -390,39 +391,19 @@ export async function executeSwap(
 }
 
 async function initializeAgent() {
-  if (!process.env.OKX_SOLANA_PRIVATE_KEY) {
-    throw new Error("OKX_SOLANA_PRIVATE_KEY is required");
+  if (!process.env.SOLANA_PRIVATE_KEY) {
+    throw new Error("SOLANA_PRIVATE_KEY is required");
   }
 
-
   try {
-    // Clean up and validate private key
-    const privateKey = encodeBase58Safe(process.env.OKX_SOLANA_PRIVATE_KEY);
-    if (!isValidBase58(privateKey)) {
-      throw new Error("Invalid base58 format for private key");
-    }
-    
-    // Debug logging (only show first/last 4 chars of private key for security)
-    console.log("\nDebug - Initialization:");
-    console.log("  Private key length:", privateKey.length);
-    console.log("  Private key format:", `${privateKey.slice(0, 4)}...${privateKey.slice(-4)}`);
-    
-    // Clean up and validate wallet address if provided
-    if (process.env.OKX_SOLANA_WALLET_ADDRESS) {
-      const walletAddress = encodeBase58Safe(process.env.OKX_SOLANA_WALLET_ADDRESS);
-      if (!isValidBase58(walletAddress)) {
-        throw new Error("Invalid base58 format for wallet address");
-      }
-      console.log("  Wallet address:", walletAddress);
-    }
+    // Create wallet from private key
+    const privateKey = bs58.decode(process.env.SOLANA_PRIVATE_KEY);
+    const keypair = Keypair.fromSecretKey(privateKey);
+    const wallet = new KeypairWallet(keypair, process.env.RPC_URL || "https://api.mainnet-beta.solana.com");
 
-    const llm = new ChatOpenAI({
-      modelName: "gpt-4",
-      temperature: 0.7,
-    });
-
-    const solanaAgent = new SolanaAgentKit(
-      privateKey,
+    // Initialize SolanaAgentKit with TokenPlugin
+    const agent = new SolanaAgentKit(
+      wallet,
       process.env.RPC_URL || "https://api.mainnet-beta.solana.com",
       {
         OPENAI_API_KEY: process.env.OPENAI_API_KEY!,
@@ -430,349 +411,82 @@ async function initializeAgent() {
         OKX_SECRET_KEY: process.env.OKX_SECRET_KEY!,
         OKX_API_PASSPHRASE: process.env.OKX_API_PASSPHRASE!,
         OKX_PROJECT_ID: process.env.OKX_PROJECT_ID!,
-        OKX_SOLANA_WALLET_ADDRESS: process.env.OKX_SOLANA_WALLET_ADDRESS!,
-        OKX_SOLANA_PRIVATE_KEY: process.env.OKX_SOLANA_PRIVATE_KEY!,
       }
-    );
+    ).use(TokenPlugin);
 
-    // Log the agent's wallet address for verification
-    console.log("  Agent wallet address:", solanaAgent.wallet_address.toString());
+    // Create Langchain tools from agent actions
+    const tools = createLangchainTools(agent, agent.actions);
 
-    const tools = [
-      tool(
-        async ({ fromAddress, toAddress, amount }) => getQuote(solanaAgent, fromAddress, toAddress, amount),
-        {
-          name: "getQuote",
-          description: "Get a quote for swapping tokens on OKX DEX",
-          schema: z.object({
-            fromAddress: z.string().describe("Source token address"),
-            toAddress: z.string().describe("Destination token address"),
-            amount: z.string().describe("Amount to swap")
-          })
-        }
-      ),
-      tool(
-        async ({ quote, fromAddress, toAddress, amount }) => executeSwap(solanaAgent, quote, fromAddress, toAddress, amount),
-        {
-          name: "executeSwap",
-          description: "Execute a token swap on OKX DEX",
-          schema: z.object({
-            quote: z.any().describe("Quote object from getQuote"),
-            fromAddress: z.string().describe("Source token address"),
-            toAddress: z.string().describe("Destination token address"),
-            amount: z.string().describe("Amount to swap")
-          })
-        }
-      )
-    ];
-
-    const agent = createReactAgent({
-      llm,
+    // Create OpenAI functions agent
+    const agentOpenAI = createOpenAIFunctionsAgent({
+      llm: new ChatOpenAI({ modelName: "gpt-4-turbo-preview" }),
       tools,
-      messageModifier: `
-        You are an expert DEX trading assistant on OKX. You help users execute trades efficiently and safely.
-        You understand market conditions, token prices, and can provide recommendations.
-        
-        When helping with trades:
-        1. Always verify token addresses and amounts
-        2. Check for sufficient balances and liquidity
-        3. Explain the expected outcome of trades
-        4. Monitor transaction status and provide clear feedback
-        5. If there are errors, explain them clearly and suggest solutions
-        
-        Common tokens:
-        - SOL: 11111111111111111111111111111111
-        - USDC: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
-        - USDT: Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB
-        
-        Be concise but informative in your responses.
-      `
     });
 
-    return { agent, solanaAgent };
+    // Create agent executor
+    const agentExecutor = new AgentExecutor({
+      agent: agentOpenAI,
+      tools,
+      verbose: true,
+    });
+
+    return { agent, agentExecutor };
   } catch (error) {
     console.error("Failed to initialize agent:", error);
     throw error;
   }
 }
 
-async function askQuestion(rl: readline.Interface, question: string): Promise<string> {
-  return new Promise((resolve) => {
-    rl.question(question, resolve);
-  });
-}
-
-export async function getQuote(agent: SolanaAgentKit, fromAddress: string, toAddress: string, amount: string) {
-  const { isValid, formatted: formattedAmount, humanReadable } = validateAndFormatAmount(amount, fromAddress);
-  
-  if (!isValid) {
-    console.log("\nInvalid amount format");
-    return { status: "error", message: "Invalid amount format" };
-  }
-
-  const toInfo = getTokenInfo(toAddress);
-  
-  console.log(`\nGetting quote for swapping ${humanReadable} to ${toInfo?.symbol || toAddress}...`);
-  
-  try {
-    // Debug logging for amount validation
-    console.log("\nDebug - Amount validation:");
-    console.log("  Raw amount:", amount);
-    console.log("  Formatted amount:", formattedAmount);
-    console.log("  Human readable:", humanReadable);
-    
-    const quote = await agent.getOkxQuote(
-      fromAddress,
-      toAddress,
-      formattedAmount,
-      "0.5"
-    );
-
-    if (!quote.status && quote.expectedOutput === "0") {
-      return { 
-        status: "error", 
-        message: "Invalid amount or no liquidity available for this swap" 
-      };
-    }
-
-    // Log the raw quote for debugging
-    console.log("\nDebug - Raw quote response:", JSON.stringify(quote, null, 2));
-
-    formatQuoteResult(quote, fromAddress, toAddress);
-    return quote;
-  } catch (err) {
-    console.error("\nError getting quote:", err);
-    if (err instanceof Error) {
-      console.log("Debug - Error details:", {
-        message: err.message,
-        stack: err.stack,
-        // @ts-ignore
-        responseBody: err.responseBody,
-        // @ts-ignore
-        requestDetails: err.requestDetails
-      });
-    }
-    return { status: "error", message: "Failed to get quote" };
-  }
-}
-
-async function findToken(query: string, agent: SolanaAgentKit): Promise<TokenInfo | undefined> {
-  query = query.toLowerCase();
-  
-  // Check exact matches first
-  for (const [address, info] of Object.entries(tokenInfoCache)) {
-    if (address.toLowerCase() === query || info.symbol.toLowerCase() === query) {
-      return info;
-    }
-  }
-
-  // Check partial matches
-  for (const [address, info] of Object.entries(tokenInfoCache)) {
-    if (info.symbol.toLowerCase().includes(query)) {
-      return info;
-    }
-  }
-
-  // If not found, try to get quote for this token against USDC to discover it
-  try {
-    const usdcAddress = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
-    const quote = await getQuote(agent, query, usdcAddress, "1");
-    if (quote?.data?.[0]?.fromToken) {
-      return {
-        symbol: quote.data[0].fromToken.tokenSymbol,
-        address: quote.data[0].fromToken.address,
-        decimals: parseInt(quote.data[0].fromToken.decimal)
-      };
-    }
-  } catch (error) {
-    // Ignore quote errors
-  }
-
-  return undefined;
-}
-
-async function runTradingBot() {
+async function runChatbot() {
   console.log("\nInitializing OKX DEX Trading Bot...");
-  const { agent, solanaAgent } = await initializeAgent();
-  
-  const rl = readline.createInterface({
+  const { agent, agentExecutor } = await initializeAgent();
+
+  console.log("\nBot initialized! You can now chat with the bot.");
+  console.log("Example commands:");
+  console.log("- Get a quote: 'Get a quote for swapping 0.1 SOL to USDC'");
+  console.log("- Execute swap: 'Swap 0.1 SOL to USDC'");
+  console.log("- Check balance: 'What's my SOL balance?'");
+  console.log("- List tokens: 'Show me available tokens'");
+  console.log("- Exit: 'exit' or 'quit'");
+
+  const readline = require('readline').createInterface({
     input: process.stdin,
     output: process.stdout
   });
 
-  let currentQuote: any = null;
-  let swapParams: { fromAddress?: string; toAddress?: string; amount?: string } = {};
-
-  const helpMessage = `
-Available commands:
-- swap [amount] [from_token] to [to_token]  (e.g. "swap 0.1 SOL to USDC")
-- quote [amount] [from_token] to [to_token]  (same as swap but only shows quote)
-- confirm                                    (confirms the last quote)
-- cancel                                     (cancels the current swap)
-- tokens                                     (lists known tokens)
-- help                                      (shows this message)
-- exit                                      (exits the bot)
-`;
-
-  const tokenAliases: Record<string, string> = {
-    'sol': 'So11111111111111111111111111111111111111112',
-    'usdc': 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-    'usdt': 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'
-  };
-
-  const getAddressFromSymbol = (symbol: string): string => {
-    const lowerSymbol = symbol.toLowerCase();
-    return tokenAliases[lowerSymbol] || symbol;
+  const askQuestion = (question: string): Promise<string> => {
+    return new Promise((resolve) => {
+      readline.question(question, resolve);
+    });
   };
 
   try {
-    console.log(helpMessage);
-
     while (true) {
-      console.log("\n=== OKX DEX Trading Bot ===");
-      const input = await askQuestion(rl, "\nWhat would you like to do? (Type 'help' for commands): ");
-      const words = input.toLowerCase().split(' ');
-
-      if (input.toLowerCase() === 'exit') {
+      const input = await askQuestion("\nYou: ");
+      
+      if (input.toLowerCase() === 'exit' || input.toLowerCase() === 'quit') {
         console.log("\nGoodbye!");
         break;
       }
 
-      if (input.toLowerCase() === 'help') {
-        console.log(helpMessage);
-        continue;
-      }
+      try {
+        const result = await agentExecutor.invoke({
+          input,
+        });
 
-      if (input.toLowerCase().startsWith('tokens')) {
-        const searchQuery = input.split(' ')[1]?.toLowerCase();
-        console.log("\nKnown tokens:");
-        const entries = Object.entries(tokenInfoCache);
-        
-        if (searchQuery) {
-          const filtered = entries.filter(([address, info]) => 
-            info.symbol.toLowerCase().includes(searchQuery) || 
-            address.toLowerCase().includes(searchQuery)
-          );
-          filtered.forEach(([address, info]) => {
-            console.log(`${info.symbol} (${info.decimals} decimals): ${address}`);
-          });
-          if (filtered.length === 0) {
-            console.log("No matching tokens found. Attempting to discover token...");
-            const discovered = await findToken(searchQuery, solanaAgent);
-            if (discovered) {
-              console.log(`Found token: ${discovered.symbol} (${discovered.decimals} decimals): ${discovered.address}`);
-            } else {
-              console.log("Token not found. Try using the full token address.");
-            }
-          }
-        } else {
-          entries.forEach(([address, info]) => {
-            console.log(`${info.symbol} (${info.decimals} decimals): ${address}`);
-          });
-        }
-        continue;
-      }
-
-      if (input.toLowerCase() === 'cancel') {
-        currentQuote = null;
-        swapParams = {};
-        console.log("\nCurrent swap cancelled.");
-        continue;
-      }
-
-      if (input.toLowerCase() === 'confirm') {
-        if (currentQuote && swapParams.fromAddress && swapParams.toAddress && swapParams.amount) {
-          console.log("\nDebug - Swap parameters:");
-          console.log("  From address:", swapParams.fromAddress);
-          console.log("  To address:", swapParams.toAddress);
-          console.log("  Amount:", swapParams.amount);
-          console.log("  Quote:", typeof currentQuote);
-          
-          try {
-            // Convert the human-readable amount to base units
-            const { formatted: formattedAmount } = validateAndFormatAmount(
-              swapParams.amount, 
-              swapParams.fromAddress
-            );
-            
-            console.log("  Formatted amount (in base units):", formattedAmount);
-            
-            // Pass the properly formatted amount in base units
-            const result = await executeSwap(
-              solanaAgent, 
-              swapParams.fromAddress, 
-              swapParams.toAddress, 
-              formattedAmount, // Use formatted amount in base units
-              "0.5", // slippage
-              false, // autoSlippage
-              "100", // maxAutoSlippageBps
-            );
-            
-            console.log("\nSwap result:", result);
-            
-            // Reset after swap attempt regardless of success
-            currentQuote = null;
-            swapParams = {};
-          } catch (error) {
-            console.error("Error executing swap:", error);
-            // Keep parameters in case the user wants to retry
-          }
-        } else {
-          console.log("\nNo active quote to confirm. Please get a quote first.");
-        }
-        continue;
-      }
-
-      // Handle swap/quote commands
-      if (words[0] === 'swap' || words[0] === 'quote') {
-        const match = input.match(/(?:swap|quote)\s+([\d.]+)\s+(\w+)\s+to\s+(\w+)/i);
-        if (match) {
-          const [_, amount, fromToken, toToken] = match;
-          const fromAddress = getAddressFromSymbol(fromToken);
-          const toAddress = getAddressFromSymbol(toToken);
-          
-          if (!fromAddress || !toAddress) {
-            console.log("\nInvalid token symbols. Use 'tokens' command to see available tokens.");
-            continue;
-          }
-          
-          swapParams = { amount, fromAddress, toAddress };
-          currentQuote = await getQuote(solanaAgent, fromAddress, toAddress, amount);
-          
-          if (words[0] === 'swap') {
-            console.log("\nTo proceed with the swap, type 'confirm' or 'cancel' to abort.");
-          }
-          continue;
-        } else {
-          console.log("\nInvalid format. Use: swap [amount] [from_token] to [to_token]");
-          console.log("Example: swap 0.1 SOL to USDC");
-          continue;
-        }
-      }
-
-      // If no command matched, use the LLM
-      const stream = await agent.stream(
-        { messages: [new HumanMessage(input)] },
-        { configurable: { thread_id: "OKX DEX Trading" } }
-      );
-
-      for await (const chunk of stream) {
-        if ("agent" in chunk) {
-          console.log(chunk.agent.messages[0].content);
-        } else if ("tools" in chunk) {
-          console.log(chunk.tools.messages[0].content);
-        }
-        console.log("-------------------");
+        console.log("\nBot:", result.output);
+      } catch (error: any) {
+        console.error("\nError:", error.message);
       }
     }
   } catch (err) {
     console.error("\nError:", err);
   } finally {
-    rl.close();
+    readline.close();
   }
 }
 
-// Start the trading bot when running directly
+// Start the chatbot when running directly
 if (require.main === module) {
-  runTradingBot().catch(console.error);
+  runChatbot().catch(console.error);
 } 

@@ -44,6 +44,9 @@ import closeAccountsUsingSolutiofiAction from "./solutiofi/actions/closeAccounts
 import mergeTokensUsingSolutiofiAction from "./solutiofi/actions/mergeTokens";
 import spreadTokenUsingSolutiofiAction from "./solutiofi/actions/spreadToken";
 
+// okx
+import okxGetQuoteAction from "./okx/actions/okxGetQuoteAction";
+
 // Import all tools
 import {
   getTokenAddressFromTicker,
@@ -79,6 +82,7 @@ import {
   mergeTokens,
   spreadToken,
 } from "./solutiofi/tools/solutiofi";
+import { okx_get_quote } from "./okx/tools/okx_get_quote";
 
 // Define and export the plugin
 const TokenPlugin = {
@@ -114,6 +118,7 @@ const TokenPlugin = {
     closeAccountsUsingSolutiofi: closeAccounts,
     mergeTokensUsingSolutiofi: mergeTokens,
     spreadTokenUsingSolutiofi: spreadToken,
+    getQuote: okx_get_quote,
   },
 
   // Combine all actions
@@ -143,6 +148,7 @@ const TokenPlugin = {
     closeAccountsUsingSolutiofiAction,
     mergeTokensUsingSolutiofiAction,
     walletAddressAction,
+    okxGetQuoteAction,
   ],
 
   // Initialize function
